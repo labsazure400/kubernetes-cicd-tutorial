@@ -37,6 +37,15 @@ jobs:
           # Configure git credential store
           git config --global credential.helper store
           echo "https://${GIT_TOKEN}:x-oauth-basic@github.com" > ~/.git-credentials
+
+###
+      - name: Update GitOps (Windows)
+        shell: pwsh
+        run: |
+          # PowerShell commands for Windows
+          $content = Get-Content deployment.yaml
+          $content -replace 'image: ghcr.io/${{ github.repository }}:.*', "image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" | Set-Content deployment.yaml
+###
           
           # Remove any existing gitops directory
           rm -rf gitops
@@ -45,11 +54,11 @@ jobs:
           git clone https://github.com/labsazure400/grade-api-gitops.git gitops
           cd gitops
           
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|image: ghcr.io/${{ github.repository }}:.*|image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" deployment.yaml
-          else
-            sed -i "s|image: ghcr.io/${{ github.repository }}:.*|image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" deployment.yaml
-          fi
+          #if [[ "$OSTYPE" == "darwin"* ]]; then
+          #  sed -i '' "s|image: ghcr.io/${{ github.repository }}:.*|image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" deployment.yaml
+          #else
+          #  sed -i "s|image: ghcr.io/${{ github.repository }}:.*|image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" deployment.yaml
+          #fi
           
           # Commit changes
           git config --global user.name "GitHub Actions"
