@@ -5,7 +5,8 @@ on:
 
 jobs:
   build-and-push:
-    runs-on: windows-latest  # Use GitHub's Windows runner
+    #runs-on: windows-latest  # Use GitHub's Windows runner
+    runs-on: self-hosted
     
     steps:
       - name: Checkout code
