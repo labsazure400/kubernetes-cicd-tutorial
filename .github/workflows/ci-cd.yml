@@ -1,26 +1,26 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline Windows
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+
 jobs:
   build-and-push:
-    runs-on: self-hosted
+    runs-on: windows-latest  # Use GitHub's Windows runner
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      # Set up Docker first
-      - name: Set up Docker Buildx
+        
+      - name: Set up Docker Buildx on Windows
         uses: docker/setup-buildx-action@v2
+        
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+          
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
@@ -29,42 +29,40 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.sha }}
+          platforms: windows/amd64  # Specify Windows platform if needed
+            
       - name: Update GitOps repository
-        shell: bash
+        shell: pwsh
         env:
           GIT_TOKEN: ${{ secrets.GITOPS_PAT }}
         run: |
-          # Configure git credential store
-          git config --global credential.helper store
-          echo "https://${GIT_TOKEN}:x-oauth-basic@github.com" > ~/.git-credentials
-
-###
-      - name: Update GitOps (Windows)
-        shell: pwsh
-        run: |
-          # PowerShell commands for Windows
-          $content = Get-Content deployment.yaml
-          $content -replace 'image: ghcr.io/${{ github.repository }}:.*', "image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" | Set-Content deployment.yaml
-###
-          
-          # Remove any existing gitops directory
-          rm -rf gitops
-          
-          # Clone repository using HTTPS URL without token
-          git clone https://github.com/labsazure400/grade-api-gitops.git gitops
-          cd gitops
-          
-          #if [[ "$OSTYPE" == "darwin"* ]]; then
-          #  sed -i '' "s|image: ghcr.io/${{ github.repository }}:.*|image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" deployment.yaml
-          #else
-          #  sed -i "s|image: ghcr.io/${{ github.repository }}:.*|image: ghcr.io/${{ github.repository }}:${{ github.sha }}|g" deployment.yaml
-          #fi
-          
-          # Commit changes
+          # Configure git
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add deployment.yaml
-          git commit -m "Update image to ${{ github.sha }}"
           
-          # Push
-          git push -f https://${GIT_TOKEN}@github.com/labsazure400/grade-api-gitops.git main
+          # Clone GitOps repo
+          $repoPath = "gitops"
+          if (Test-Path $repoPath) {
+            Remove-Item -Recurse -Force $repoPath
+          }
+          
+          # Clone with authentication
+          $cloneUrl = "https://${env:GIT_TOKEN}@github.com/labsazure400/grade-api-gitops.git"
+          git clone $cloneUrl $repoPath
+          
+          Set-Location $repoPath
+          
+          # Update the image tag in deployment.yaml
+          $deploymentFile = "deployment.yaml"
+          $pattern = 'image: ghcr.io/[^:]+:.*'
+          $replacement = "image: ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          
+          (Get-Content $deploymentFile -Raw) -replace $pattern, $replacement | Set-Content $deploymentFile
+          
+          # Check if changes were made
+          git diff
+          
+          # Commit and push
+          git add $deploymentFile
+          git commit -m "Update image to ${{ github.sha }}"
+          git push
